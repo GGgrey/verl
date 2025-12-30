@@ -107,6 +107,7 @@ class AdvantageEstimator(str, Enum):
     GRPO_VECTORIZED = "grpo_vectorized"
     RFPO = "rfpo"
     CODAPO = "codapo"
+    CGPO = "cgpo"
 
 
 ADV_ESTIMATOR_REGISTRY: dict[str, Any] = {}
@@ -328,6 +329,137 @@ def compute_grpo_outcome_advantage(
         scores = scores.unsqueeze(-1) * response_mask
 
     return scores, scores
+
+
+@register_adv_est(AdvantageEstimator.CGPO)  # or simply: @register_adv_est("cgpo")
+def compute_cgpo_outcome_advantage(
+    token_level_rewards: torch.Tensor,
+    confidences: torch.Tensor,
+    response_mask: torch.Tensor,
+    index: np.ndarray,
+    epsilon: float = 1e-6,
+    norm_adv_by_std_in_grpo: bool = True,
+    config: Optional[AlgoConfig] = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Compute advantage for RFPO, operating only on Outcome reward
+    (with only one scalar reward for each response).
+
+    Args:
+        token_level_rewards: `(torch.Tensor)`
+            shape is (bs, response_length)
+        confidences: `(torch.Tensor)`
+            shape is (bs, response_length)
+        response_mask: `(torch.Tensor)`
+            shape is (bs, response_length)
+        index: `(np.ndarray)`
+            index array for grouping
+        epsilon: `(float)`
+            small value to avoid division by zero
+        eta: `(float)`
+            hyperparameter for balancing advantage
+        norm_adv_by_std_in_grpo: `(bool)`
+            whether to scale the RFPO advantage
+        config: `(Optional[AlgoConfig])`
+            algorithm configuration object
+
+    Note:
+        If norm_adv_by_std_in_grpo is True, the advantage is scaled by the std, as in the original GRPO.
+        If False, the advantage is not scaled, as in Dr.GRPO (https://arxiv.org/abs/2503.20783).
+
+    Returns:
+        advantages: `(torch.Tensor)`
+            shape is (bs, response_length)
+        Returns: `(torch.Tensor)`
+            shape is (bs, response_length)
+    """
+    margin = 0.0
+    ratio = 0.2
+    advantage_high = 0.1
+    advantage_low = 0.2
+    beta = 0.1
+
+    bsz = token_level_rewards.shape[0]
+    device = token_level_rewards.device
+
+    with torch.no_grad():
+        outcome_scores = token_level_rewards.sum(dim=-1)
+        is_correct = (outcome_scores > 0).float()
+        actual_lengths = response_mask.sum(dim=-1) + epsilon
+        mean_confidences = (confidences * response_mask).sum(dim=-1) / actual_lengths
+
+        id2conf = defaultdict(list)
+        for i in range(bsz):
+            id2conf[index[i]].append(mean_confidences[i])
+
+        id2minmax = {}
+        for idx, confidence_list in id2conf.items():
+            stack = torch.stack(confidence_list)
+            id2minmax[idx] = (stack.min(), stack.max())
+
+        sequence_scores = torch.zeros(bsz, device=device)
+        for i in range(bsz):
+            min_confidence, max_confidence = id2minmax[index[i]]
+            if max_confidence > min_confidence:
+                norm_confidence = (mean_confidences[i] - min_confidence) / (max_confidence - min_confidence + epsilon)
+            else:
+                norm_confidence = torch.tensor(0.0, device=device)
+
+            weight = margin + (1.0 - margin) * norm_confidence
+
+            sequence_scores[i] = weight * (2.0 * is_correct[i] - 1.0)
+
+    with torch.no_grad():
+        id2score = defaultdict(list)
+        for i in range(bsz):
+            id2score[index[i]].append(sequence_scores[i])
+
+        id2stats = {}
+        for idx, score_list in id2score.items():
+            stack = torch.stack(score_list)
+            if len(stack) > 1:
+                id2stats[idx] = (stack.mean(), stack.std())
+            else:
+                id2stats[idx] = (torch.tensor(0.0, device=device), torch.tensor(1.0, device=device))
+
+        advantages = torch.zeros_like(token_level_rewards)
+
+        for i in range(bsz):
+            mean, std = id2stats[index[i]]
+            if norm_adv_by_std_in_grpo:
+                advantage = (sequence_scores[i] - mean) / (std + epsilon)
+            else:
+                advantage = sequence_scores[i] - mean
+
+            if is_correct[i] == 1:
+                advantage = torch.clamp(advantage, min=advantage_low)
+            else:
+                advantage = torch.clamp(advantage, max=advantage_high)
+
+            sample_advantage = torch.full_like(token_level_rewards[i], advantage)
+            k = int(actual_lengths[i].item() * ratio)
+            k = max(1, k)
+
+            sample_confidence = confidences[i].clone()
+            sample_confidence[~response_mask[i].bool()] = float("inf")
+            _, topk_idx = torch.topk(sample_confidence, k=k, largest=False)
+
+            valid_confidence = confidences[i][response_mask[i].bool()]
+            cmin = valid_confidence.min()
+            cmax = valid_confidence.max()
+            denom = (cmax - cmin).clamp_min(epsilon)
+            conf_norm = ((confidences[i] - cmin) / denom).clamp(0.0, 1.0)
+            token_beta_t = (1.0 - conf_norm).clamp(0.0, 1.0)
+
+            sign = 1.0 if is_correct[i] == 1 else -1.0
+
+            sample_advantage[topk_idx] += sign * token_beta_t[topk_idx] * beta
+
+            advantages[i] = sample_advantage
+    
+    advantages = advantages * response_mask
+
+    return advantages, advantages
 
 
 @register_adv_est(AdvantageEstimator.CODAPO)  # or simply: @register_adv_est("codapo")

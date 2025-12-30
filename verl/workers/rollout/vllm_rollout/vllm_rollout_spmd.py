@@ -77,7 +77,7 @@ from verl.utils.distributed import initialize_global_process_group_ray
 from verl.utils.model import get_lora_rank_from_adapter
 from verl.utils.profiler import GPUMemoryLogger
 from verl.utils.ray_utils import ray_noset_visible_devices
-from verl.utils.torch_functional import get_response_mask, pad_2d_list_to_length
+from verl.utils.torch_functional import get_response_mask, pad_2d_list_to_length, compute_confidence
 from verl.utils.vllm import TensorLoRARequest, VLLMHijack, is_version_ge
 from verl.workers.config import HFModelConfig, RolloutConfig
 from verl.workers.rollout.base import BaseRollout
@@ -392,15 +392,27 @@ class vLLMRollout(BaseRollout):
 
             response = []
             rollout_log_probs = []
+            rollout_confs = []
             for output in outputs:
                 for sample_id in range(len(output.outputs)):
                     response_ids = output.outputs[sample_id].token_ids
                     response.append(response_ids)
+
+                    if self.config.calculate_confs:
+                        conf_list = compute_confidence(output.outputs[sample_id].logprobs)
+                        rollout_confs.append(conf_list)
+
                     if self.config.calculate_log_probs:
                         curr_log_prob = []
                         for i, logprob in enumerate(output.outputs[sample_id].logprobs):
                             curr_log_prob.append(logprob[response_ids[i]].logprob)
                         rollout_log_probs.append(curr_log_prob)
+
+            if self.config.calculate_confs:
+                rollout_confs = pad_2d_list_to_length(
+                    rollout_confs, -1, max_length=self.config.response_length
+                ).to(idx.device)
+                rollout_confs = rollout_confs.to(torch.float32)
 
             response = pad_2d_list_to_length(response, self.pad_token_id, max_length=self.config.response_length).to(
                 idx.device
@@ -444,6 +456,9 @@ class vLLMRollout(BaseRollout):
         if self.config.calculate_log_probs:
             # we will recompute old log prob with actor
             batch["rollout_log_probs"] = rollout_log_probs
+
+        if self.config.calculate_confs:
+            batch["rollout_confs"] = rollout_confs
 
         return DataProto(batch=batch, non_tensor_batch=non_tensor_batch)
 

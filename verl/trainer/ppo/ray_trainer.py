@@ -239,6 +239,22 @@ def compute_advantage(
         )
         data.batch["advantages"] = advantages
         data.batch["returns"] = returns
+    elif adv_estimator == AdvantageEstimator.CGPO:
+        confidences = data.batch["rollout_confs"]
+        response_mask = data.batch["response_mask"]
+        response_mask = response_mask.to(confidences.dtype)
+
+        advantages, returns = core_algos.compute_cgpo_outcome_advantage(
+            token_level_rewards=data.batch["token_level_rewards"],
+            confidences=confidences,
+            response_mask=response_mask,
+            index=data.non_tensor_batch["uid"],
+            norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
+            config=config,
+        )
+
+        data.batch["advantages"] = advantages
+        data.batch["returns"] = returns
     elif adv_estimator == AdvantageEstimator.RFPO:
         old_log_probs = data.batch["old_log_probs"]  # Shape: [n * batch_size, response_length]
         response_mask = data.batch["response_mask"]  # Shape: [n * batch_size, response_length]
@@ -1205,7 +1221,7 @@ class RayPPOTrainer:
                         norm_adv_by_std_in_grpo = self.config.algorithm.get(
                             "norm_adv_by_std_in_grpo", True
                         )  # GRPO adv normalization factor
-
+                        
                         batch = compute_advantage(
                             batch,
                             adv_estimator=self.config.algorithm.adv_estimator,

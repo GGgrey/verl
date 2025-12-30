@@ -5,12 +5,12 @@ export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
 export WANDB_DIR="/workspace/verl_exp/"
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
+export CUDA_VISIBLE_DEVICES="3,4,5,6"
 
-project_name='GRPO'
-exp_name='GRPO-Qwen2.5-3B'
+project_name='CGPO'
+exp_name='CGPO-Qwen2.5-1.5B'
 
-adv_estimator=grpo
+adv_estimator=cgpo
 
 use_kl_in_reward=False
 use_kl_loss=True
@@ -34,7 +34,7 @@ NNODES=${NNODES:-1}
 
 # Paths
 RAY_DATA_HOME=${RAY_DATA_HOME:-"/workspace/verl_exp"}
-MODEL_PATH=${MODEL_PATH:-"/models/Qwen/Qwen2.5-3B"}
+MODEL_PATH=${MODEL_PATH:-"/models/Qwen/Qwen2.5-1.5B"}
 CKPTS_DIR=${CKPTS_DIR:-"${RAY_DATA_HOME}/ckpts/${project_name}/${exp_name}"}
 TRAIN_FILE=${TRAIN_FILE:-"${RAY_DATA_HOME}/data/math/train.parquet"}
 TEST_FILE=${TEST_FILE:-"${RAY_DATA_HOME}/data/math/test.parquet"}
@@ -75,8 +75,9 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=4 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.55 \
     actor_rollout_ref.rollout.n=${n_resp_per_prompt} \
+    actor_rollout_ref.rollout.calculate_confs=True \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     trainer.critic_warmup=0 \
@@ -90,4 +91,4 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     trainer.test_freq=10 \
     trainer.default_local_dir="${CKPTS_DIR}" \
     trainer.resume_mode=auto \
-    trainer.total_epochs=1 2>&1 | tee grpo_qwen2.5_3b.log
+    trainer.total_epochs=1 2>&1 | tee cgpo_qwen2.5_1.5b.log

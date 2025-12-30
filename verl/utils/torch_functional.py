@@ -17,8 +17,9 @@ Contain small torch utilities
 
 import math
 from contextlib import contextmanager
-from typing import Optional
+from typing import List, Optional, Dict
 
+import numpy as np
 import torch
 import torch.distributed
 import torch.nn.functional as F
@@ -304,6 +305,24 @@ def _minmax(x: torch.Tensor, eps: float) -> torch.Tensor:
     mn = x.min()
     mx = x.max()
     return (x - mn) / (mx - mn + eps)
+
+
+def compute_confidence(logprobs: List[Dict]) -> List[float]:
+    """
+    Compute confidence score from logprobs.
+    Args:
+        logprobs: list of logprobs
+    Returns:
+        list of confidence scores
+    """
+    confs = []
+    for token_logprobs in logprobs:
+        if token_logprobs:
+            # vLLM returns a dict of {token_id: Logprob object}
+            # Get the selected token's logprob (the one with highest probability)
+            mean_logprob = np.mean([lp.logprob for lp in token_logprobs.values()])
+            confs.append(round(-mean_logprob, 3))
+    return confs
 
 
 def get_response_mask(response_id: torch.Tensor, eos_token: int | list[int] = 2, dtype=torch.int64):

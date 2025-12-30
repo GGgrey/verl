@@ -196,6 +196,8 @@ multi_turn:
 # "Truncated importance sampling" requires rollout log probs, set to True when turning on Truncated importance sampling
 calculate_log_probs: False
 
+calculate_confs: False
+
 # [Experimental] agent loop based rollout configs
 agent:
 
