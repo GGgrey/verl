@@ -77,6 +77,8 @@ algorithm:
   # Advantage estimator type: "gae", "grpo", "reinforce_plus_plus", etc.
   adv_estimator: gae
 
+  confclip_hyperparameter: 0.2
+
   # Smoothing parameter for RRF in RFPO
   rrf_k: 1.0
 

@@ -3,14 +3,15 @@ set -x
 export RAY_TMPDIR="/workspace/tmp/"
 export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
 export WANDB_DIR="/workspace/verl_exp/"
+export WANDB_MODE=offline
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="4,5,6,7"
+export CUDA_VISIBLE_DEVICES="6,7"
 
-project_name='RFPO'
-exp_name='RFPO-Qwen2.5-Math-7B'
+project_name='ConfClip'
+exp_name='ConfClip-Qwen2.5-1.5B'
 
-adv_estimator=rfpo
+adv_estimator=confclip
 
 use_kl_in_reward=False
 use_kl_loss=True
@@ -34,7 +35,7 @@ NNODES=${NNODES:-1}
 
 # Paths
 RAY_DATA_HOME=${RAY_DATA_HOME:-"/workspace/verl_exp"}
-MODEL_PATH=${MODEL_PATH:-"/models/Qwen/Qwen2.5-Math-7B"}
+MODEL_PATH=${MODEL_PATH:-"/models/Qwen/Qwen2.5-1.5B"}
 CKPTS_DIR=${CKPTS_DIR:-"${RAY_DATA_HOME}/ckpts/${project_name}/${exp_name}"}
 TRAIN_FILE=${TRAIN_FILE:-"${RAY_DATA_HOME}/data/math/train.parquet"}
 TEST_FILE=${TEST_FILE:-"${RAY_DATA_HOME}/data/math/test.parquet"}
@@ -56,6 +57,7 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     data.filter_overlong_prompts=${filter_overlong_prompts} \
     data.truncation='error' \
     algorithm.adv_estimator=${adv_estimator} \
+    algorithm.confclip_hyperparameter=0.2 \
     algorithm.use_kl_in_reward=${use_kl_in_reward} \
     actor_rollout_ref.model.path="${MODEL_PATH}" \
     actor_rollout_ref.actor.loss_agg_mode=${loss_agg_mode} \
@@ -75,13 +77,13 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=4 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.60 \
     actor_rollout_ref.rollout.n=${n_resp_per_prompt} \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     trainer.critic_warmup=0 \
     trainer.val_before_train=False \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=2 \
     trainer.nnodes="${NNODES}" \
     trainer.logger=['console','wandb'] \
     trainer.project_name="${project_name}" \
@@ -90,4 +92,4 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     trainer.test_freq=10 \
     trainer.default_local_dir="${CKPTS_DIR}" \
     trainer.resume_mode=auto \
-    trainer.total_epochs=1 2>&1 | tee rfpo_qwen2.5_math_7b.log
+    trainer.total_epochs=1 2>&1 | tee confclip_qwen2.5_1.5b.log

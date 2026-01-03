@@ -108,6 +108,7 @@ class AdvantageEstimator(str, Enum):
     RFPO = "rfpo"
     CODAPO = "codapo"
     CGPO = "cgpo"
+    CONFCLIP="confclip"
 
 
 ADV_ESTIMATOR_REGISTRY: dict[str, Any] = {}
@@ -331,6 +332,47 @@ def compute_grpo_outcome_advantage(
     return scores, scores
 
 
+@register_adv_est(AdvantageEstimator.CONFCLIP)
+def compute_confclip_outcome_advantage(
+    token_level_rewards: torch.Tensor,
+    response_mask: torch.Tensor,
+    index: np.ndarray,
+    self_confidents,
+    sentence_wise_mean,
+    epsilon: float = 1e-6,
+    norm_adv_by_std_in_grpo: bool = True,
+    config: Optional[AlgoConfig] = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    confclip_hyperparameter = config.get("confclip_hyperparameter", 0.2)
+    scores = token_level_rewards.sum(dim=-1)
+    scores *= torch.clamp(sentence_wise_mean, min=1-confclip_hyperparameter, max=1+confclip_hyperparameter)
+    id2score = defaultdict(list)
+    id2mean = {}
+    id2std = {}
+
+    with torch.no_grad():
+        bsz = scores.shape[0]
+        for i in range(bsz):
+            id2score[index[i]].append(scores[i])
+        for idx in id2score:
+            if len(id2score[idx]) == 1:
+                id2mean[idx] = torch.tensor(0.0)
+                id2std[idx] = torch.tensor(1.0)
+            elif len(id2score[idx]) > 1:
+                id2mean[idx] = torch.mean(torch.tensor(id2score[idx]))
+                id2std[idx] = torch.std(torch.tensor([id2score[idx]]))
+            else:
+                raise ValueError(f"no score in prompt index: {idx}")
+        for i in range(bsz):
+            if norm_adv_by_std_in_grpo:
+                scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
+            else:
+                scores[i] = scores[i] - id2mean[index[i]]
+        scores = scores.unsqueeze(-1) * response_mask
+
+    return scores, scores
+
+
 @register_adv_est(AdvantageEstimator.CGPO)  # or simply: @register_adv_est("cgpo")
 def compute_cgpo_outcome_advantage(
     token_level_rewards: torch.Tensor,
@@ -374,10 +416,10 @@ def compute_cgpo_outcome_advantage(
             shape is (bs, response_length)
     """
     margin = 0.0
-    ratio = 0.2
+    ratio = 0.3
     advantage_high = 0.1
     advantage_low = 0.2
-    beta = 0.1
+    beta = 0.4
 
     bsz = token_level_rewards.shape[0]
     device = token_level_rewards.device

@@ -12,6 +12,7 @@ from lighteval.metrics.metrics import Metrics, math_scorer
 from lighteval.metrics.utils.metric_utils import (
     SampleLevelMetric,
     SamplingMethod,
+    SampleLevelMetricGrouping,
 )
 from lighteval.metrics.dynamic_metrics import MultilingualExtractiveMatchMetric
 from lighteval.metrics.utils.extractive_match_utils import (
@@ -24,6 +25,12 @@ from lighteval.metrics.utils.extractive_match_utils import (
 from lighteval.tasks.lighteval_task import LightevalTaskConfig
 from lighteval.tasks.requests import Doc
 from lighteval.utils.language import Language
+from lighteval.metrics.metrics_sample import (
+    PassAtK,
+    AvgAtN,
+    GPassAtK,
+    MajAtN,
+)
 import numpy as np
 
 
@@ -238,6 +245,73 @@ expr_gold_metric = SampleLevelMetric(
     higher_is_better=True,
 )
 
+pass_at_k_math = SampleLevelMetric(
+    metric_name="pass@k",
+    sample_level_fn=PassAtK(
+        strip_strings=True,
+        # Extracting mathematical expressions and latex expressions
+        sample_scoring_function=MultilingualExtractiveMatchMetric(
+            language=Language.ENGLISH,
+            gold_extraction_target=[ExprExtractionConfig(), LatexExtractionConfig()],
+            pred_extraction_target=[ExprExtractionConfig(), LatexExtractionConfig()],
+            precision=6,
+        ),
+    ),
+    category=SamplingMethod.GENERATIVE,
+    corpus_level_fn=np.mean,
+    higher_is_better=True,
+)
+
+avg_at_n_math = SampleLevelMetric(
+    metric_name="avg@n",
+    sample_level_fn=AvgAtN(
+        sample_scoring_function=MultilingualExtractiveMatchMetric(
+            language=Language.ENGLISH,
+            gold_extraction_target=[ExprExtractionConfig(), LatexExtractionConfig()],
+            pred_extraction_target=[ExprExtractionConfig(), LatexExtractionConfig()],
+            precision=6,
+        ),
+    ),
+    category=SamplingMethod.GENERATIVE,
+    corpus_level_fn=np.mean,
+    higher_is_better=True,
+)
+
+g_pass_at_k_math = SampleLevelMetricGrouping(
+    metric_name="math-g-pass@k",
+    sample_level_fn=GPassAtK(
+        name_prefix="math",
+        strip_strings=True,
+        sample_scoring_function=MultilingualExtractiveMatchMetric(
+            language=Language.ENGLISH,
+            fallback_mode="first_match",
+            precision=5,
+            gold_extraction_target=(ExprExtractionConfig(),),
+            # Match boxed first before trying other regexes
+            pred_extraction_target=(ExprExtractionConfig(), LatexExtractionConfig(boxed_match_priority=0)),
+            aggregation_function=max,
+        ),
+    ),
+    category=SamplingMethod.GENERATIVE,
+    corpus_level_fn=np.mean,
+    higher_is_better=True,
+)
+
+maj_at_n = SampleLevelMetric(
+    metric_name="maj@n",
+    sample_level_fn=MajAtN(
+        sample_scoring_function=MultilingualExtractiveMatchMetric(
+            language=Language.ENGLISH,
+            gold_extraction_target=[ExprExtractionConfig(), LatexExtractionConfig()],
+            pred_extraction_target=[ExprExtractionConfig(), LatexExtractionConfig()],
+            precision=6,
+        ),
+    ),
+    category=SamplingMethod.GENERATIVE,
+    corpus_level_fn=np.mean,
+    higher_is_better=True,
+)
+
 gpqa_metric = SampleLevelMetric(
     metric_name="extractive_match",
     sample_level_fn=MultilingualExtractiveMatchMetric(
@@ -306,6 +380,74 @@ aime24_custom = LightevalTaskConfig(
     scorer=math_scorer(),
 )
 
+aime24_passk_custom = LightevalTaskConfig(
+    name="aime24_passk_custom",
+    prompt_function=aime_prompt_fn,
+    hf_repo="HuggingFaceH4/aime_2024",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[pass_at_k_math(sample_params={"k": 16, "n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+aime24_avg_custom = LightevalTaskConfig(
+    name="aime24_avg_custom",
+    prompt_function=aime_prompt_fn,
+    hf_repo="HuggingFaceH4/aime_2024",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[avg_at_n_math(sample_params={"n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+aime24_gpassk_custom = LightevalTaskConfig(
+    name="aime24_gpassk_custom",
+    prompt_function=aime_prompt_fn,
+    hf_repo="HuggingFaceH4/aime_2024",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[g_pass_at_k_math(sample_params={"k": 16, "n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+aime24_majk_custom = LightevalTaskConfig(
+    name="aime24_majk_custom",
+    prompt_function=aime_prompt_fn,
+    hf_repo="HuggingFaceH4/aime_2024",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[maj_at_n(sample_params={"n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
 aime25_custom = LightevalTaskConfig(
     name="aime25_custom",
     prompt_function=aime_prompt_fn,
@@ -317,6 +459,74 @@ aime25_custom = LightevalTaskConfig(
     few_shots_select=None,
     generation_size=32768,
     metrics=[expr_gold_metric],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+aime25_passk_custom = LightevalTaskConfig(
+    name="aime25_passk_custom",
+    prompt_function=aime_prompt_fn,
+    hf_repo="yentinglin/aime_2025",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[pass_at_k_math(sample_params={"k": 16, "n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+aime25_avg_custom = LightevalTaskConfig(
+    name="aime25_avg_custom",
+    prompt_function=aime_prompt_fn,
+    hf_repo="yentinglin/aime_2025",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[avg_at_n_math(sample_params={"n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+aime25_gpassk_custom = LightevalTaskConfig(
+    name="aime25_gpassk_custom",
+    prompt_function=aime_prompt_fn,
+    hf_repo="yentinglin/aime_2025",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[g_pass_at_k_math(sample_params={"k": 16, "n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+aime25_majk_custom = LightevalTaskConfig(
+    name="aime25_majk_custom",
+    prompt_function=aime_prompt_fn,
+    hf_repo="yentinglin/aime_2025",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[maj_at_n(sample_params={"n": 32})],
     version=1,
     sample_fields=record_to_sample,
     solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
@@ -392,6 +602,74 @@ amc23_custom = LightevalTaskConfig(
     scorer=math_scorer(),
 )
 
+amc23_passk_custom = LightevalTaskConfig(
+    name="amc23_passk_custom",
+    prompt_function=amc_prompt_fn,
+    hf_repo="knoveleng/AMC-23",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[pass_at_k_math(sample_params={"k": 16, "n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+amc23_avg_custom = LightevalTaskConfig(
+    name="amc23_avg_custom",
+    prompt_function=amc_prompt_fn,
+    hf_repo="knoveleng/AMC-23",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[avg_at_n_math(sample_params={"n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+amc23_gpassk_custom = LightevalTaskConfig(
+    name="amc23_gpassk_custom",
+    prompt_function=amc_prompt_fn,
+    hf_repo="knoveleng/AMC-23",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[g_pass_at_k_math(sample_params={"k": 16, "n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
+amc23_majk_custom = LightevalTaskConfig(
+    name="amc23_majk_custom",
+    prompt_function=amc_prompt_fn,
+    hf_repo="knoveleng/AMC-23",
+    hf_subset="default",
+    hf_avail_splits=["train"],
+    evaluation_splits=["train"],
+    few_shots_split=None,
+    few_shots_select=None,
+    generation_size=32768,
+    metrics=[maj_at_n(sample_params={"n": 32})],
+    version=1,
+    sample_fields=record_to_sample,
+    solver=[prompt_template(MATH_QUERY_TEMPLATE), generate(cache=True)],
+    scorer=math_scorer(),
+)
+
 olympiadbench_custom = LightevalTaskConfig(
     name="olympiadbench_custom",
     prompt_function=olympiadbench_prompt_fn,
@@ -453,4 +731,19 @@ TASKS_TABLE = [
     olympiadbench_custom,
     gsm_plus_custom,
     mmlu_pro_custom,
+
+    aime24_passk_custom,
+    aime24_avg_custom,
+    aime24_gpassk_custom,
+    aime24_majk_custom,
+
+    aime25_passk_custom,
+    aime25_avg_custom,
+    aime25_gpassk_custom,
+    aime25_majk_custom,
+
+    amc23_passk_custom,
+    amc23_avg_custom,
+    amc23_gpassk_custom,
+    amc23_majk_custom,
 ]

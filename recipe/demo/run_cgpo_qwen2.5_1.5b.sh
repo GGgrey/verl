@@ -5,7 +5,7 @@ export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
 export WANDB_DIR="/workspace/verl_exp/"
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="3,4,5,6"
+export CUDA_VISIBLE_DEVICES="5,6"
 
 project_name='CGPO'
 exp_name='CGPO-Qwen2.5-1.5B'
@@ -82,7 +82,7 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     trainer.critic_warmup=0 \
     trainer.val_before_train=False \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=2 \
     trainer.nnodes="${NNODES}" \
     trainer.logger=['console','wandb'] \
     trainer.project_name="${project_name}" \
