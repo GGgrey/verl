@@ -1,0 +1,141 @@
+{
+  "config_general": {
+    "lighteval_sha": "?",
+    "num_fewshot_seeds": 1,
+    "max_samples": null,
+    "job_id": "0",
+    "start_time": 2814903.538644253,
+    "end_time": 2815018.336029703,
+    "total_evaluation_time_secondes": "114.7973854499869",
+    "model_config": {
+      "model_name": "/workspace/verl_exp/ckpts/Qwen2.5-1.5B-ConfClip-Math-1Epoch",
+      "generation_parameters": {
+        "num_blocks": null,
+        "block_size": null,
+        "early_stopping": null,
+        "repetition_penalty": null,
+        "frequency_penalty": null,
+        "length_penalty": null,
+        "presence_penalty": null,
+        "max_new_tokens": 4096,
+        "min_new_tokens": null,
+        "seed": 1234,
+        "stop_tokens": null,
+        "temperature": 0.0,
+        "top_k": null,
+        "min_p": null,
+        "top_p": null,
+        "truncate_prompt": null,
+        "cache_implementation": null,
+        "response_format": null
+      },
+      "system_prompt": null,
+      "cache_dir": "~/.cache/huggingface/lighteval",
+      "tokenizer": null,
+      "revision": "main",
+      "dtype": "bfloat16",
+      "tensor_parallel_size": 1,
+      "data_parallel_size": 6,
+      "pipeline_parallel_size": 1,
+      "gpu_memory_utilization": 0.8,
+      "enable_prefix_caching": null,
+      "max_model_length": 5120,
+      "quantization": null,
+      "load_format": null,
+      "swap_space": 4,
+      "seed": 1234,
+      "trust_remote_code": false,
+      "add_special_tokens": true,
+      "multichoice_continuations_start_space": true,
+      "pairwise_tokenization": false,
+      "max_num_seqs": 128,
+      "max_num_batched_tokens": 2048,
+      "subfolder": null,
+      "is_async": false,
+      "override_chat_template": null
+    },
+    "model_name": "/workspace/verl_exp/ckpts/Qwen2.5-1.5B-ConfClip-Math-1Epoch"
+  },
+  "results": {
+    "math_500_custom|0": {
+      "latex_match": 0.54,
+      "latex_match_stderr": 0.022311333245289663
+    },
+    "all": {
+      "latex_match": 0.54,
+      "latex_match_stderr": 0.022311333245289663
+    }
+  },
+  "versions": {},
+  "config_tasks": {
+    "math_500_custom|0": {
+      "name": "math_500_custom",
+      "prompt_function": "math_500_prompt_fn",
+      "hf_repo": "HuggingFaceH4/MATH-500",
+      "hf_subset": "default",
+      "metrics": [
+        {
+          "metric_name": "latex_match",
+          "higher_is_better": true,
+          "category": "GENERATIVE",
+          "sample_level_fn": "MultilingualExtractiveMatchMetric(language=Language.ENGLISH, gold_extraction_target=(LatexExtractionConfig(try_extract_without_anchor=True, boxed_match_priority=55, normalization_config=NormalizationConfig(basic_latex=True, units=True, malformed_operators=True, nits=True, boxed='all', equations=True)),), pred_extraction_target=(ExprExtractionConfig(try_extract_without_anchor=True), LatexExtractionConfig(try_extract_without_anchor=True, boxed_match_priority=0, normalization_config=NormalizationConfig(basic_latex=True, units=True, malformed_operators=True, nits=True, boxed='all', equations=True))), aggregation_function=max, fallback_mode=first_match, extraction_mode=any_match, precision=5, timeout_seconds=5)",
+          "corpus_level_fn": "mean",
+          "batched_compute": false
+        }
+      ],
+      "solver": [
+        "solve",
+        "solve"
+      ],
+      "scorer": "score",
+      "sample_fields": "record_to_sample",
+      "sample_to_fewshot": null,
+      "filter": null,
+      "hf_revision": null,
+      "hf_filter": null,
+      "hf_avail_splits": [
+        "test"
+      ],
+      "evaluation_splits": [
+        "test"
+      ],
+      "few_shots_split": null,
+      "few_shots_select": null,
+      "generation_size": 32768,
+      "generation_grammar": null,
+      "stop_sequence": [],
+      "num_samples": null,
+      "original_num_docs": -1,
+      "effective_num_docs": -1,
+      "must_remove_duplicate_docs": false,
+      "num_fewshots": 0,
+      "version": 1
+    }
+  },
+  "summary_tasks": {
+    "math_500_custom|0": {
+      "hashes": {
+        "hash_examples": "8060d4dc67f3ba3e",
+        "hash_full_prompts": "ef46db3751d8e999",
+        "hash_input_tokens": "13989995ea04a9dc",
+        "hash_cont_tokens": "6004c0dcf0fb6020"
+      },
+      "truncated": 0,
+      "non_truncated": 0,
+      "padded": 0,
+      "non_padded": 0
+    }
+  },
+  "summary_general": {
+    "hashes": {
+      "hash_examples": "74a239b5fec2a8a5",
+      "hash_full_prompts": "c166e5d20ad58f4e",
+      "hash_input_tokens": "05b40fe949a3f095",
+      "hash_cont_tokens": "d0a02ee3d6368972"
+    },
+    "truncated": 0,
+    "non_truncated": 0,
+    "padded": 0,
+    "non_padded": 0
+  }
+}

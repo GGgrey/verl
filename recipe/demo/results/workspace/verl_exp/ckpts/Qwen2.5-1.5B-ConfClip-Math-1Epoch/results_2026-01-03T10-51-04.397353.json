@@ -1,0 +1,141 @@
+{
+  "config_general": {
+    "lighteval_sha": "?",
+    "num_fewshot_seeds": 1,
+    "max_samples": null,
+    "job_id": "0",
+    "start_time": 2819299.423671299,
+    "end_time": 2819424.993607617,
+    "total_evaluation_time_secondes": "125.56993631785735",
+    "model_config": {
+      "model_name": "/workspace/verl_exp/ckpts/Qwen2.5-1.5B-ConfClip-Math-1Epoch",
+      "generation_parameters": {
+        "num_blocks": null,
+        "block_size": null,
+        "early_stopping": null,
+        "repetition_penalty": null,
+        "frequency_penalty": null,
+        "length_penalty": null,
+        "presence_penalty": null,
+        "max_new_tokens": 4096,
+        "min_new_tokens": null,
+        "seed": 1234,
+        "stop_tokens": null,
+        "temperature": 1.0,
+        "top_k": null,
+        "min_p": null,
+        "top_p": 0.95,
+        "truncate_prompt": null,
+        "cache_implementation": null,
+        "response_format": null
+      },
+      "system_prompt": null,
+      "cache_dir": "~/.cache/huggingface/lighteval",
+      "tokenizer": null,
+      "revision": "main",
+      "dtype": "bfloat16",
+      "tensor_parallel_size": 1,
+      "data_parallel_size": 6,
+      "pipeline_parallel_size": 1,
+      "gpu_memory_utilization": 0.8,
+      "enable_prefix_caching": null,
+      "max_model_length": 5120,
+      "quantization": null,
+      "load_format": null,
+      "swap_space": 4,
+      "seed": 1234,
+      "trust_remote_code": false,
+      "add_special_tokens": true,
+      "multichoice_continuations_start_space": true,
+      "pairwise_tokenization": false,
+      "max_num_seqs": 128,
+      "max_num_batched_tokens": 2048,
+      "subfolder": null,
+      "is_async": false,
+      "override_chat_template": null
+    },
+    "model_name": "/workspace/verl_exp/ckpts/Qwen2.5-1.5B-ConfClip-Math-1Epoch"
+  },
+  "results": {
+    "aime25_majk_custom|0": {
+      "maj@n:n=32:n=32:n=32": 0.0,
+      "maj@n:n=32:n=32:n=32_stderr": 0.0
+    },
+    "all": {
+      "maj@n:n=32:n=32:n=32": 0.0,
+      "maj@n:n=32:n=32:n=32_stderr": 0.0
+    }
+  },
+  "versions": {},
+  "config_tasks": {
+    "aime25_majk_custom|0": {
+      "name": "aime25_majk_custom",
+      "prompt_function": "aime_prompt_fn",
+      "hf_repo": "yentinglin/aime_2025",
+      "hf_subset": "default",
+      "metrics": [
+        {
+          "metric_name": "maj@n:n=32:n=32:n=32",
+          "higher_is_better": true,
+          "category": "GENERATIVE",
+          "sample_level_fn": "MajAtN(normalize=None, strip_strings=False, compute_score=compute, type_exact_match=None, n=32, attribute_must_be_set=['n'])",
+          "corpus_level_fn": "mean",
+          "batched_compute": false
+        }
+      ],
+      "solver": [
+        "solve",
+        "solve"
+      ],
+      "scorer": "score",
+      "sample_fields": "record_to_sample",
+      "sample_to_fewshot": null,
+      "filter": null,
+      "hf_revision": null,
+      "hf_filter": null,
+      "hf_avail_splits": [
+        "train"
+      ],
+      "evaluation_splits": [
+        "train"
+      ],
+      "few_shots_split": null,
+      "few_shots_select": null,
+      "generation_size": 32768,
+      "generation_grammar": null,
+      "stop_sequence": [],
+      "num_samples": null,
+      "original_num_docs": -1,
+      "effective_num_docs": -1,
+      "must_remove_duplicate_docs": false,
+      "num_fewshots": 0,
+      "version": 1
+    }
+  },
+  "summary_tasks": {
+    "aime25_majk_custom|0": {
+      "hashes": {
+        "hash_examples": "fcf3715fb58371c5",
+        "hash_full_prompts": "ef46db3751d8e999",
+        "hash_input_tokens": "fd7f24515cced77e",
+        "hash_cont_tokens": "594c3426bbc29e66"
+      },
+      "truncated": 0,
+      "non_truncated": 0,
+      "padded": 0,
+      "non_padded": 0
+    }
+  },
+  "summary_general": {
+    "hashes": {
+      "hash_examples": "c93463482fab0fa8",
+      "hash_full_prompts": "c166e5d20ad58f4e",
+      "hash_input_tokens": "099da0db52df4ba3",
+      "hash_cont_tokens": "b4ff87b8f13f07f1"
+    },
+    "truncated": 0,
+    "non_truncated": 0,
+    "padded": 0,
+    "non_padded": 0
+  }
+}
