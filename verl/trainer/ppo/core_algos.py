@@ -383,125 +383,78 @@ def compute_cgpo_outcome_advantage(
     norm_adv_by_std_in_grpo: bool = True,
     config: Optional[AlgoConfig] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Compute advantage for RFPO, operating only on Outcome reward
-    (with only one scalar reward for each response).
-
-    Args:
-        token_level_rewards: `(torch.Tensor)`
-            shape is (bs, response_length)
-        confidences: `(torch.Tensor)`
-            shape is (bs, response_length)
-        response_mask: `(torch.Tensor)`
-            shape is (bs, response_length)
-        index: `(np.ndarray)`
-            index array for grouping
-        epsilon: `(float)`
-            small value to avoid division by zero
-        eta: `(float)`
-            hyperparameter for balancing advantage
-        norm_adv_by_std_in_grpo: `(bool)`
-            whether to scale the RFPO advantage
-        config: `(Optional[AlgoConfig])`
-            algorithm configuration object
-
-    Note:
-        If norm_adv_by_std_in_grpo is True, the advantage is scaled by the std, as in the original GRPO.
-        If False, the advantage is not scaled, as in Dr.GRPO (https://arxiv.org/abs/2503.20783).
-
-    Returns:
-        advantages: `(torch.Tensor)`
-            shape is (bs, response_length)
-        Returns: `(torch.Tensor)`
-            shape is (bs, response_length)
-    """
-    margin = 0.0
-    ratio = 0.3
-    advantage_high = 0.1
-    advantage_low = 0.2
-    beta = 0.4
-
+    beta = 0.5
     bsz = token_level_rewards.shape[0]
     device = token_level_rewards.device
+    dtype = token_level_rewards.dtype
 
     with torch.no_grad():
-        outcome_scores = token_level_rewards.sum(dim=-1)
-        is_correct = (outcome_scores > 0).float()
-        actual_lengths = response_mask.sum(dim=-1) + epsilon
+        actual_lengths = response_mask.sum(dim=-1).clamp_min(1.0)
         mean_confidences = (confidences * response_mask).sum(dim=-1) / actual_lengths
 
         id2conf = defaultdict(list)
         for i in range(bsz):
             id2conf[index[i]].append(mean_confidences[i])
 
-        id2minmax = {}
+        id2med = {}
+        id2mad = {}
         for idx, confidence_list in id2conf.items():
-            stack = torch.stack(confidence_list)
-            id2minmax[idx] = (stack.min(), stack.max())
-
-        sequence_scores = torch.zeros(bsz, device=device)
-        for i in range(bsz):
-            min_confidence, max_confidence = id2minmax[index[i]]
-            if max_confidence > min_confidence:
-                norm_confidence = (mean_confidences[i] - min_confidence) / (max_confidence - min_confidence + epsilon)
+            confidences_tensor = torch.stack(confidence_list).to(device=device, dtype=dtype)
+            if confidences_tensor.numel() == 1:
+                id2med[idx] = confidences_tensor[0]
+                id2mad[idx] = torch.tensor(float("inf"), device=device, dtype=dtype)
             else:
-                norm_confidence = torch.tensor(0.0, device=device)
-
-            weight = margin + (1.0 - margin) * norm_confidence
-
-            sequence_scores[i] = weight * (2.0 * is_correct[i] - 1.0)
+                med_confidence = confidences_tensor.median()
+                mad_confidence = (confidences_tensor - med_confidence).abs().median().clamp_min(epsilon)
+                id2med[idx] = med_confidence
+                id2mad[idx] = mad_confidence
+        
+        intrinsic_scores = torch.zeros(bsz, device=device, dtype=dtype)
+        for i in range(bsz):
+            idx = index[i]
+            mad = id2mad[idx]
+            if torch.isinf(mad):
+                intrinsic_scores[i] = torch.tensor(0.5, device=device, dtype=dtype)
+            else:
+                normalized_confidence = (mean_confidences[i] - id2med[idx]) / mad
+                intrinsic_scores[i] = torch.sigmoid(normalized_confidence).clamp(0.0, 1.0)
+    
+    raw_outcome_scores = token_level_rewards.sum(dim=-1)
+    outcome_scores = raw_outcome_scores.clone()
+    id2score = defaultdict(list)
+    id2mean = {}
+    id2std = {}
 
     with torch.no_grad():
-        id2score = defaultdict(list)
         for i in range(bsz):
-            id2score[index[i]].append(sequence_scores[i])
-
-        id2stats = {}
-        for idx, score_list in id2score.items():
-            stack = torch.stack(score_list)
-            if len(stack) > 1:
-                id2stats[idx] = (stack.mean(), stack.std())
+            id2score[index[i]].append(outcome_scores[i])
+        for idx in id2score:
+            if len(id2score[idx]) == 1:
+                id2mean[idx] = torch.tensor(0.0)
+                id2std[idx] = torch.tensor(1.0)
+            elif len(id2score[idx]) > 1:
+                scores_tensor = torch.stack(id2score[idx])
+                id2mean[idx] = torch.mean(scores_tensor)
+                id2std[idx] = torch.std(scores_tensor)
             else:
-                id2stats[idx] = (torch.tensor(0.0, device=device), torch.tensor(1.0, device=device))
-
-        advantages = torch.zeros_like(token_level_rewards)
-
+                raise ValueError(f"no score in prompt index: {idx}")
         for i in range(bsz):
-            mean, std = id2stats[index[i]]
             if norm_adv_by_std_in_grpo:
-                advantage = (sequence_scores[i] - mean) / (std + epsilon)
+                outcome_scores[i] = (outcome_scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
             else:
-                advantage = sequence_scores[i] - mean
+                outcome_scores[i] = outcome_scores[i] - id2mean[index[i]]
+            
+        is_correct = (raw_outcome_scores > 0).to(outcome_scores.dtype)
+        correct_factor = 2.0 - intrinsic_scores
+        wrong_factor = 1.0 + intrinsic_scores
+        factor = is_correct * correct_factor + (1.0 - is_correct) * wrong_factor
 
-            if is_correct[i] == 1:
-                advantage = torch.clamp(advantage, min=advantage_low)
-            else:
-                advantage = torch.clamp(advantage, max=advantage_high)
+        factor = factor.clamp(1.0, 1.5)
+        outcome_scores = outcome_scores * factor
 
-            sample_advantage = torch.full_like(token_level_rewards[i], advantage)
-            k = int(actual_lengths[i].item() * ratio)
-            k = max(1, k)
+        scores = outcome_scores.unsqueeze(-1) * response_mask
 
-            sample_confidence = confidences[i].clone()
-            sample_confidence[~response_mask[i].bool()] = float("inf")
-            _, topk_idx = torch.topk(sample_confidence, k=k, largest=False)
-
-            valid_confidence = confidences[i][response_mask[i].bool()]
-            cmin = valid_confidence.min()
-            cmax = valid_confidence.max()
-            denom = (cmax - cmin).clamp_min(epsilon)
-            conf_norm = ((confidences[i] - cmin) / denom).clamp(0.0, 1.0)
-            token_beta_t = (1.0 - conf_norm).clamp(0.0, 1.0)
-
-            sign = 1.0 if is_correct[i] == 1 else -1.0
-
-            sample_advantage[topk_idx] += sign * token_beta_t[topk_idx] * beta
-
-            advantages[i] = sample_advantage
-    
-    advantages = advantages * response_mask
-
-    return advantages, advantages
+    return scores, scores
 
 
 @register_adv_est(AdvantageEstimator.CODAPO)  # or simply: @register_adv_est("codapo")

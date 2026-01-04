@@ -5,7 +5,7 @@ export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
 export WANDB_DIR="/workspace/verl_exp/"
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="5,6"
+export CUDA_VISIBLE_DEVICES="6,7"
 
 project_name='CGPO'
 exp_name='CGPO-Qwen2.5-1.5B'
