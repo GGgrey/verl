@@ -5,9 +5,9 @@ export VLLM_WORKER_MULTIPROC_METHOD=spawn
 
 date=`date '+%Y-%m-%d-%H-%M-%S'`
 
-export CUDA_VISIBLE_DEVICES="2,3,4,5,6,7"
+export CUDA_VISIBLE_DEVICES="6,7"
 
-NUM_GPU_PER_NODE=6
+NUM_GPU_PER_NODE=2
 NUM_NODES=1
 NUM_GPUS=$((${NUM_NODES} * ${NUM_GPU_PER_NODE}))
 
@@ -27,13 +27,13 @@ echo "Start time: $start_time"
 # MODEL=/workspace/verl_exp/ckpts/Qwen2.5-1.5B-DAPO-Math-1Epoch
 # MODEL=/workspace/verl_exp/ckpts/Qwen2.5-1.5B-GSPO-Math-1Epoch
 # MODEL=/workspace/verl_exp/ckpts/Qwen2.5-3B-GRPO-Math-1Epoch
-# MODEL=/workspace/verl_exp/ckpts/Qwen2.5-1.5B-CGPO-Math-1Epoch-1
+MODEL=/workspace/verl_exp/ckpts/Qwen2.5-1.5B-CGPO-Math-1Epoch-1
 # MODEL=/workspace/verl_exp/ckpts/Qwen2.5-3B-DAPO-Math-1Epoch
 # MODEL=/workspace/verl_exp/ckpts/Qwen2.5-3B-GSPO-Math-1Epoch
-MODEL=/workspace/verl_exp/ckpts/Qwen2.5-1.5B-ConfClip-Math-1Epoch
+# MODEL=/workspace/verl_exp/ckpts/Qwen2.5-1.5B-ConfClip-Math-1Epoch
 
-MODEL_ARGS="model_name=$MODEL,dtype=bfloat16,data_parallel_size=$NUM_GPUS,max_model_length=5120,gpu_memory_utilization=0.8,generation_parameters={max_new_tokens:4096,temperature:1.0,top_p:0.95,seed:1234}"
-# MODEL_ARGS="model_name=$MODEL,dtype=bfloat16,data_parallel_size=$NUM_GPUS,max_model_length=5120,gpu_memory_utilization=0.8,generation_parameters={max_new_tokens:4096,temperature:0.0,seed:1234}"
+# MODEL_ARGS="model_name=$MODEL,dtype=bfloat16,data_parallel_size=$NUM_GPUS,max_model_length=5120,gpu_memory_utilization=0.8,generation_parameters={max_new_tokens:4096,temperature:1.0,top_p:0.95,seed:1234}"
+MODEL_ARGS="model_name=$MODEL,dtype=bfloat16,data_parallel_size=$NUM_GPUS,max_model_length=5120,gpu_memory_utilization=0.8,generation_parameters={max_new_tokens:4096,temperature:0.0,seed:1234}"
 
 OUTPUT_DIR=/workspace/verl/recipe/demo
 CUSTOM_TASKS_PATH=/workspace/verl/recipe/demo/evaluate.py

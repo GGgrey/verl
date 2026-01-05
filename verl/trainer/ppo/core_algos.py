@@ -449,7 +449,6 @@ def compute_cgpo_outcome_advantage(
         wrong_factor = 1.0 + intrinsic_scores
         factor = is_correct * correct_factor + (1.0 - is_correct) * wrong_factor
 
-        factor = factor.clamp(1.0, 1.5)
         outcome_scores = outcome_scores * factor
 
         scores = outcome_scores.unsqueeze(-1) * response_mask
