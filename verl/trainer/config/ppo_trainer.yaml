@@ -77,16 +77,21 @@ algorithm:
   # Advantage estimator type: "gae", "grpo", "reinforce_plus_plus", etc.
   adv_estimator: gae
 
+  # ConfClip
   confclip_hyperparameter: 0.2
 
   # Smoothing parameter for RRF in RFPO
   rrf_k: 1.0
 
-  # Fraction of the tail
+  # Fraction of the tail in RFPO
   tail_frac: 0.1
 
   # Metric weights for RRF in RFPO
   metric_weights: {"mean_logprob": 1.0, "tail_mean_logprob": 2.0, "min_logprob": 1.0}
+
+  alpha: 0.5
+
+  beta: 0.5
 
   # Whether to normalize advantages by std (specific to GRPO)
   norm_adv_by_std_in_grpo: True

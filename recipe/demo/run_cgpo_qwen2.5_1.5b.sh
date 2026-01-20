@@ -1,8 +1,9 @@
 set -x
 
-export RAY_TMPDIR="/workspace/tmp/"
+export RAY_TMPDIR="/workspace/verl_exp/"
 export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
 export WANDB_DIR="/workspace/verl_exp/"
+export WANDB_MODE=online
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
 export CUDA_VISIBLE_DEVICES="6,7"

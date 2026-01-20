@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-export RAY_TMPDIR="/workspace/tmp/"
+export RAY_TMPDIR="/workspace/verl_exp/"
 export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
 export WANDB_DIR="/workspace/verl_exp/"
-export WANDB_MODE=offline
+export WANDB_MODE=online
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="6,7"
+export CUDA_VISIBLE_DEVICES="4,5,6,7"
 
 project_name='DAPO'
 exp_name='DAPO-Qwen2.5-1.5B'
 
-adv_estimator=grpo
+adv_estimator=cgpo
 
 use_kl_in_reward=False
 kl_coef=0.0
@@ -99,7 +99,7 @@ python3 -m recipe.dapo.main_dapo \
     trainer.logger='["console","wandb"]' \
     trainer.project_name="${project_name}" \
     trainer.experiment_name="${exp_name}" \
-    trainer.n_gpus_per_node=2 \
+    trainer.n_gpus_per_node=4 \
     trainer.nnodes="${NNODES}" \
     trainer.val_before_train=False \
     trainer.test_freq=10 \

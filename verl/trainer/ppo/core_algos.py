@@ -383,77 +383,91 @@ def compute_cgpo_outcome_advantage(
     norm_adv_by_std_in_grpo: bool = True,
     config: Optional[AlgoConfig] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    beta = 0.5
-    bsz = token_level_rewards.shape[0]
-    device = token_level_rewards.device
-    dtype = token_level_rewards.dtype
-
-    with torch.no_grad():
-        actual_lengths = response_mask.sum(dim=-1).clamp_min(1.0)
-        mean_confidences = (confidences * response_mask).sum(dim=-1) / actual_lengths
-
-        id2conf = defaultdict(list)
-        for i in range(bsz):
-            id2conf[index[i]].append(mean_confidences[i])
-
-        id2med = {}
-        id2mad = {}
-        for idx, confidence_list in id2conf.items():
-            confidences_tensor = torch.stack(confidence_list).to(device=device, dtype=dtype)
-            if confidences_tensor.numel() == 1:
-                id2med[idx] = confidences_tensor[0]
-                id2mad[idx] = torch.tensor(float("inf"), device=device, dtype=dtype)
-            else:
-                med_confidence = confidences_tensor.median()
-                mad_confidence = (confidences_tensor - med_confidence).abs().median().clamp_min(epsilon)
-                id2med[idx] = med_confidence
-                id2mad[idx] = mad_confidence
-        
-        intrinsic_scores = torch.zeros(bsz, device=device, dtype=dtype)
-        for i in range(bsz):
-            idx = index[i]
-            mad = id2mad[idx]
-            if torch.isinf(mad):
-                intrinsic_scores[i] = torch.tensor(0.5, device=device, dtype=dtype)
-            else:
-                normalized_confidence = (mean_confidences[i] - id2med[idx]) / mad
-                intrinsic_scores[i] = torch.sigmoid(normalized_confidence).clamp(0.0, 1.0)
+    if confidences.shape != response_mask.shape:
+        raise ValueError(
+            f"Confidences shape {confidences.shape} must match response_mask shape {response_mask.shape}"
+        )
     
-    raw_outcome_scores = token_level_rewards.sum(dim=-1)
-    outcome_scores = raw_outcome_scores.clone()
+    alpha = config.get("alpha", 0.2)
+    beta = config.get("beta", 0.2)
+
+    scores = token_level_rewards.sum(dim=-1)
     id2score = defaultdict(list)
     id2mean = {}
     id2std = {}
 
+    correct_mask = scores > 0
+    wrong_mask = scores < 0
+
+    id2confs = defaultdict(list)
+    id2confs_mean = {}
+    id2confs_std = {}
+    response_length = response_mask.sum(dim=-1).clamp_min(1.0)
+    mean_confidences = (confidences * response_mask).sum(dim=-1) / response_length
+    if scores.shape != mean_confidences.shape:
+        raise ValueError(
+            f"Confidences shape {confidences.shape} must match scores shape {scores.shape}"
+        )
+
     with torch.no_grad():
+        bsz = scores.shape[0]
         for i in range(bsz):
-            id2score[index[i]].append(outcome_scores[i])
+            id2score[index[i]].append(scores[i])
+            id2confs[index[i]].append(mean_confidences[i])
         for idx in id2score:
             if len(id2score[idx]) == 1:
                 id2mean[idx] = torch.tensor(0.0)
                 id2std[idx] = torch.tensor(1.0)
+                id2confs_mean[idx] = torch.tensor(0.0)
+                id2confs_std[idx] = torch.tensor(1.0)
             elif len(id2score[idx]) > 1:
                 scores_tensor = torch.stack(id2score[idx])
                 id2mean[idx] = torch.mean(scores_tensor)
                 id2std[idx] = torch.std(scores_tensor)
+                confs_tensor = torch.stack(id2confs[idx])
+                id2confs_mean[idx] = torch.mean(confs_tensor)
+                id2confs_std[idx] = torch.std(confs_tensor)
             else:
-                raise ValueError(f"no score in prompt index: {idx}")
+                raise ValueError(f"No score in prompt index: {idx}")
         for i in range(bsz):
             if norm_adv_by_std_in_grpo:
-                outcome_scores[i] = (outcome_scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
+                scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
+                mean_confidences[i] = (mean_confidences[i] - id2confs_mean[index[i]]) / (id2confs_std[index[i]] + epsilon)
             else:
-                outcome_scores[i] = outcome_scores[i] - id2mean[index[i]]
-            
-        is_correct = (raw_outcome_scores > 0).to(outcome_scores.dtype)
-        correct_factor = 2.0 - intrinsic_scores
-        wrong_factor = 1.0 + intrinsic_scores
-        factor = is_correct * correct_factor + (1.0 - is_correct) * wrong_factor
+                scores[i] = scores[i] - id2mean[index[i]]
+                mean_confidences[i] = mean_confidences[i] - id2confs_mean[index[i]]
 
-        outcome_scores = outcome_scores * factor
+        scores[correct_mask] = scores[correct_mask] + alpha * torch.sigmoid(-mean_confidences[correct_mask])
+        scores[wrong_mask] = scores[wrong_mask] - alpha * torch.sigmoid(mean_confidences[wrong_mask])
 
-        scores = outcome_scores.unsqueeze(-1) * response_mask
+        scores = scores.unsqueeze(-1) * response_mask        
 
-    return scores, scores
+        token_confs = confidences * response_mask
+        token_mean = mean_confidences.unsqueeze(-1)
+        token_var = ((token_confs - token_mean) * response_mask).pow(2).sum(dim=-1, keepdim=True) / response_length.unsqueeze(-1)
+        token_std = torch.sqrt(token_var + epsilon)
+        token_z = (token_confs - token_mean) / token_std
+        token_shape = torch.tanh(token_z) * response_mask
+
+        correct_mask_2d = correct_mask.unsqueeze(-1)
+        wrong_mask_2d = wrong_mask.unsqueeze(-1)
+
+        token_weights = torch.ones_like(token_confs) * response_mask
+        token_weights = torch.where(
+            correct_mask_2d,
+            (1.0 - beta * token_shape),
+            token_weights
+        )
+        token_weights = torch.where(
+            wrong_mask_2d,
+            (1.0 + beta * token_shape),
+            token_weights
+        )
+        token_weights = token_weights * response_mask
+
+        token_advantages = scores * token_weights
+
+    return token_advantages, token_advantages
 
 
 @register_adv_est(AdvantageEstimator.CODAPO)  # or simply: @register_adv_est("codapo")
