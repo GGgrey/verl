@@ -239,19 +239,29 @@ def compute_advantage(
         )
         data.batch["advantages"] = advantages
         data.batch["returns"] = returns
+    elif adv_estimator == AdvantageEstimator.CODAPO:
+        calculation_mask = data.batch["response_mask"]
+        advantages, returns = core_algos.compute_codapo_outcome_advantage(
+            token_level_rewards=data.batch["token_level_rewards"],
+            old_log_probs=data.batch["old_log_probs"],
+            response_mask=calculation_mask,
+            index=data.non_tensor_batch["uid"],
+            norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
+        )
+        data.batch["advantages"] = advantages
+        data.batch["returns"] = returns
     elif adv_estimator == AdvantageEstimator.CONFCLIP:
-        self_confidents = data.batch["old_log_probs"]
-        grpo_calculation_mask = data.batch["response_mask"]
-        grpo_calculation_mask = grpo_calculation_mask.to(self_confidents.dtype)
-        sentence_wise_mean = masked_mean(
-            torch.exp(self_confidents.detach()), mask=grpo_calculation_mask, axis=-1
+        old_log_probs = data.batch["old_log_probs"]
+        calculation_mask = data.batch["response_mask"]
+        calculation_mask = calculation_mask.to(old_log_probs.dtype)
+        masked_mean_probs = masked_mean(
+            torch.exp(old_log_probs.detach()), mask=calculation_mask, axis=-1
         )
         advantages, returns = core_algos.compute_confclip_outcome_advantage(
             token_level_rewards=data.batch["token_level_rewards"],
-            response_mask=grpo_calculation_mask,
+            response_mask=calculation_mask,
             index=data.non_tensor_batch["uid"],
-            self_confidents=self_confidents,
-            sentence_wise_mean=sentence_wise_mean,
+            confidences=masked_mean_probs,
             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
             config=config,
         )

@@ -337,15 +337,14 @@ def compute_confclip_outcome_advantage(
     token_level_rewards: torch.Tensor,
     response_mask: torch.Tensor,
     index: np.ndarray,
-    self_confidents,
-    sentence_wise_mean,
+    confidences,
     epsilon: float = 1e-6,
     norm_adv_by_std_in_grpo: bool = True,
     config: Optional[AlgoConfig] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     confclip_hyperparameter = config.get("confclip_hyperparameter", 0.2)
     scores = token_level_rewards.sum(dim=-1)
-    scores *= torch.clamp(sentence_wise_mean, min=1-confclip_hyperparameter, max=1+confclip_hyperparameter)
+    scores *= torch.clamp(confidences, min=1-confclip_hyperparameter, max=1+confclip_hyperparameter)
     id2score = defaultdict(list)
     id2mean = {}
     id2std = {}
