@@ -9,7 +9,7 @@ export HYDRA_FULL_ERROR=1
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
 
 project_name='CoDaPO'
-exp_name='CoDaPO-Qwen2.5-1.5B'
+exp_name='CoDaPO-Qwen2.5-3B'
 
 adv_estimator=codapo
 
@@ -35,7 +35,7 @@ NNODES=${NNODES:-1}
 
 # Paths
 RAY_DATA_HOME=${RAY_DATA_HOME:-"/root/siton-data-0072803f053947c8bb3fe64d115b30e3/verl_exp"}
-MODEL_PATH=${MODEL_PATH:-"/root/siton-data-0072803f053947c8bb3fe64d115b30e3/models/Qwen/Qwen2.5-1.5B"}
+MODEL_PATH=${MODEL_PATH:-"/root/siton-data-0072803f053947c8bb3fe64d115b30e3/models/Qwen/Qwen2.5-3B"}
 CKPTS_DIR=${CKPTS_DIR:-"${RAY_DATA_HOME}/ckpts/${project_name}/${exp_name}"}
 TRAIN_FILE=${TRAIN_FILE:-"${RAY_DATA_HOME}/data/math/train.parquet"}
 TEST_FILE=${TEST_FILE:-"${RAY_DATA_HOME}/data/math/test.parquet"}
@@ -91,4 +91,4 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     trainer.test_freq=10 \
     trainer.default_local_dir="${CKPTS_DIR}" \
     trainer.resume_mode=auto \
-    trainer.total_epochs=1 2>&1 | tee codapo_qwen2.5_1.5b.log
+    trainer.total_epochs=1 2>&1 | tee codapo_qwen2.5_3b.log
