@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-export RAY_TMPDIR="/workspace/verl_exp/"
+export RAY_TMPDIR="/root/tmp/"
 export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
-export WANDB_DIR="/workspace/verl_exp/"
+export WANDB_DIR="/root/siton-data-0072803f053947c8bb3fe64d115b30e3/verl_exp/"
 export WANDB_MODE=online
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="4,5,6,7"
+export CUDA_VISIBLE_DEVICES="0,1,2,3"
 
 project_name='DAPO'
 exp_name='DAPO-Qwen2.5-1.5B'
 
-adv_estimator=cgpo
+adv_estimator=grpo
 
 use_kl_in_reward=False
 kl_coef=0.0
@@ -39,8 +39,8 @@ RUNTIME_ENV=${RUNTIME_ENV:-"${WORKING_DIR}/verl/trainer/runtime_env.yaml"}
 NNODES=${NNODES:-1}
 
 # Paths
-RAY_DATA_HOME=${RAY_DATA_HOME:-"/workspace/verl_exp"}
-MODEL_PATH=${MODEL_PATH:-"/models/Qwen/Qwen2.5-1.5B"}
+RAY_DATA_HOME=${RAY_DATA_HOME:-"/root/siton-data-0072803f053947c8bb3fe64d115b30e3/verl_exp"}
+MODEL_PATH=${MODEL_PATH:-"/root/siton-data-0072803f053947c8bb3fe64d115b30e3/models/Qwen/Qwen2.5-1.5B"}
 CKPTS_DIR=${CKPTS_DIR:-"${RAY_DATA_HOME}/ckpts/${project_name}/${exp_name}"}
 TRAIN_FILE=${TRAIN_FILE:-"${RAY_DATA_HOME}/data/math/train.parquet"}
 TEST_FILE=${TEST_FILE:-"${RAY_DATA_HOME}/data/math/test.parquet"}
