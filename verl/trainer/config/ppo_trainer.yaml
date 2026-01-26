@@ -89,7 +89,9 @@ algorithm:
   # Metric weights for RRF in RFPO
   metric_weights: {"mean_logprob": 1.0, "tail_mean_logprob": 2.0, "min_logprob": 1.0}
 
-  alpha: 0.2
+  alpha_correct: 0.2
+
+  alpha_wrong: 0.1
 
   beta: 0.1
 

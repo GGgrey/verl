@@ -387,7 +387,8 @@ def compute_cgpo_outcome_advantage(
             f"Confidences shape {confidences.shape} must match response_mask shape {response_mask.shape}"
         )
     
-    alpha = config.get("alpha", 0.2)
+    alpha_correct = config.get("alpha_correct", 0.2)
+    alpha_wrong = config.get("alpha_wrong", 0.1)
     beta = config.get("beta", 0.2)
 
     scores = token_level_rewards.sum(dim=-1)
@@ -436,8 +437,8 @@ def compute_cgpo_outcome_advantage(
                 scores[i] = scores[i] - id2mean[index[i]]
                 mean_confidences[i] = mean_confidences[i] - id2confs_mean[index[i]]
 
-        scores[correct_mask] = scores[correct_mask] + alpha * torch.sigmoid(-mean_confidences[correct_mask])
-        scores[wrong_mask] = scores[wrong_mask] - alpha * torch.sigmoid(mean_confidences[wrong_mask])
+        scores[correct_mask] = scores[correct_mask] + alpha_correct * torch.sigmoid(-mean_confidences[correct_mask])
+        scores[wrong_mask] = scores[wrong_mask] - alpha_wrong * torch.sigmoid(mean_confidences[wrong_mask])
 
         scores = scores.unsqueeze(-1) * response_mask        
 
