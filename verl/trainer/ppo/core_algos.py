@@ -389,7 +389,7 @@ def compute_cgpo_outcome_advantage(
     
     alpha_correct = config.get("alpha_correct", 0.2)
     alpha_wrong = config.get("alpha_wrong", 0.1)
-    beta = config.get("beta", 0.2)
+    beta = config.get("beta", 0.1)
 
     scores = token_level_rewards.sum(dim=-1)
     id2score = defaultdict(list)
