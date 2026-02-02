@@ -109,6 +109,7 @@ class AdvantageEstimator(str, Enum):
     CODAPO = "codapo"
     CGPO = "cgpo"
     CONFCLIP="confclip"
+    CDPO = "cdpo"
 
 
 ADV_ESTIMATOR_REGISTRY: dict[str, Any] = {}
@@ -468,6 +469,104 @@ def compute_cgpo_outcome_advantage(
         token_advantages = scores * token_weights
 
     return token_advantages, token_advantages
+
+
+@register_adv_est(AdvantageEstimator.CDPO)  # or simply: @register_adv_est("cdpo")
+def compute_cdpo_outcome_advantage(
+    token_level_rewards: torch.Tensor,
+    confidences: torch.Tensor,
+    response_mask: torch.Tensor,
+    index: np.ndarray,
+    epsilon: float = 1e-6,
+    norm_adv_by_std_in_grpo: bool = True,
+    config: Optional[AlgoConfig] = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if confidences.shape != response_mask.shape:
+        raise ValueError(
+            f"Confidences shape {confidences.shape} must match response_mask shape {response_mask.shape}"
+        )
+    scores = token_level_rewards.sum(dim=-1)
+    id2score = defaultdict(list)
+    id2mean = {}
+    id2std = {}
+    correct_mask = (scores == 1.0)
+    wrong_mask = (scores == 0.0)
+
+    id2conf = defaultdict(list)
+    id2conf_mean = {}
+    id2conf_std = {}
+    response_length = response_mask.sum(dim=-1).clamp_min(1.0)
+    mean_confidences = (confidences * response_mask).sum(dim=-1) / response_length
+    if scores.shape != mean_confidences.shape:
+        raise ValueError(
+            f"Confidences shape {confidences.shape} must match scores shape {scores.shape}"
+        )
+    breakpoint()
+    with torch.no_grad():
+        bsz = scores.shape[0]
+        for i in range(bsz):
+            id2score[index[i]].append(scores[i])
+            id2conf[index[i]].append(mean_confidences[i])
+        for idx in id2score:
+            if len(id2score[idx]) == 1:
+                id2mean[idx] = torch.tensor(0.0)
+                id2std[idx] = torch.tensor(1.0)
+                id2conf_mean[idx] = torch.tensor(0.0)
+                id2conf_std[idx] = torch.tensor(1.0)
+            elif len(id2score[idx]) > 1:
+                scores_tensor = torch.stack(id2score[idx])
+                id2mean[idx] = torch.mean(scores_tensor)
+                id2std[idx] = torch.std(scores_tensor)
+                confs_tensor = torch.stack(id2conf[idx])
+                id2conf_mean[idx] = torch.mean(confs_tensor)
+                id2conf_std[idx] = torch.std(confs_tensor)
+            else:
+                raise ValueError(f"No score in prompt index: {idx}")
+        for i in range(bsz):
+            if norm_adv_by_std_in_grpo:
+                scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
+                mean_confidences[i] = (mean_confidences[i] - id2conf_mean[index[i]]) / (id2conf_std[index[i]] + epsilon)
+            else:
+                scores[i] = scores[i] - id2mean[index[i]]
+                mean_confidences[i] = mean_confidences[i] - id2conf_mean[index[i]]
+
+        scores = scores.unsqueeze(-1) * response_mask
+        mean_confidences = -mean_confidences
+        mean_confidences = mean_confidences.unsqueeze(-1) * response_mask
+
+        new_scores = scores + 0.2 * mean_confidences
+
+        advantages = verl_F.masked_whiten(new_scores, response_mask) * response_mask
+
+        mu = verl_F.masked_mean(confidences, response_mask, axis=-1).unsqueeze(-1)
+        var = verl_F.masked_var(confidences, response_mask)
+        var_tok = verl_F.masked_mean((confidences - mu) ** 2, response_mask, axis=-1).unsqueeze(-1)
+        z = ((confidences - mu) * torch.rsqrt(var_tok + 1e-8)) * response_mask
+
+        high_cert = torch.sigmoid(z / 1.0) * response_mask
+        low_cert = (1.0 - high_cert) * response_mask
+
+        correct_t = correct_mask.unsqueeze(-1) * response_mask
+        wrong_t = wrong_mask.unsqueeze(-1) * response_mask
+
+        w = torch.ones_like(advantages)
+        w = torch.where(correct_t.bool(), low_cert.clamp_min(0.0).pow(1.0), w)
+        w = torch.where(wrong_t.bool(), high_cert.clamp_min(0.0).pow(1.0), w)
+
+        w_final = (1.0 - 0.5) + 0.5 * w
+
+        advantages = advantages * w_final * response_mask
+
+        base_mag = torch.clamp(scores.abs(), min=1e-3)
+        lower_bound_correct = base_mag / 5.0
+        upper_bound_wrong = -base_mag / 5.0
+
+        advantages = torch.where(correct_t.bool(), torch.maximum(advantages, lower_bound_correct), advantages)
+        advantages = torch.where(wrong_t.bool(), torch.minimum(advantages, upper_bound_wrong), advantages)
+
+        advantages = advantages * response_mask
+    
+    return advantages, advantages
 
 
 @register_adv_est(AdvantageEstimator.CODAPO)  # or simply: @register_adv_est("codapo")
