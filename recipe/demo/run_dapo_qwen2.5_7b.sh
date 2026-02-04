@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-export RAY_TMPDIR="/root/tmp/"
+export RAY_TMPDIR="/data1/sunq/projects/verl_exp/"
+export RAY_memory_monitor_refresh_ms=0
 export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
-export WANDB_DIR="/root/siton-data-0072803f053947c8bb3fe64d115b30e3/verl_exp/"
+export WANDB_DIR="/data1/sunq/projects/verl_exp/"
 export WANDB_MODE=online
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
+export CUDA_VISIBLE_DEVICES="2,3"
 
 project_name='DAPO'
-exp_name='DAPO-Qwen2.5-1.5B'
+exp_name='DAPO-Qwen2.5-7B'
 
 adv_estimator=grpo
 
@@ -25,9 +26,9 @@ clip_ratio_high=0.28
 max_prompt_length=$((1024 * 1))
 max_response_length=$((1024 * 4))
 
-train_prompt_bsz=128
+train_prompt_bsz=8
 n_resp_per_prompt=8
-train_prompt_mini_bsz=128
+train_prompt_mini_bsz=8
 filter_overlong_prompts=True
 
 loss_agg_mode="token-mean"
@@ -39,8 +40,8 @@ RUNTIME_ENV=${RUNTIME_ENV:-"${WORKING_DIR}/verl/trainer/runtime_env.yaml"}
 NNODES=${NNODES:-1}
 
 # Paths
-RAY_DATA_HOME=${RAY_DATA_HOME:-"/root/siton-data-0072803f053947c8bb3fe64d115b30e3/verl_exp"}
-MODEL_PATH=${MODEL_PATH:-"/root/siton-data-0072803f053947c8bb3fe64d115b30e3/models/Qwen/Qwen2.5-1.5B"}
+RAY_DATA_HOME=${RAY_DATA_HOME:-"/data1/sunq/projects/verl_exp"}
+MODEL_PATH=${MODEL_PATH:-"/data1/sunq/projects/models/Qwen/Qwen2.5-7B"}
 CKPTS_DIR=${CKPTS_DIR:-"${RAY_DATA_HOME}/ckpts/${project_name}/${exp_name}"}
 TRAIN_FILE=${TRAIN_FILE:-"${RAY_DATA_HOME}/data/math/train.parquet"}
 TEST_FILE=${TEST_FILE:-"${RAY_DATA_HOME}/data/math/test.parquet"}
@@ -86,11 +87,11 @@ python3 -m recipe.dapo.main_dapo \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.actor.ppo_mini_batch_size=${train_prompt_mini_bsz} \
-    actor_rollout_ref.actor.fsdp_config.param_offload=False \
-    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.actor.fsdp_config.param_offload=True \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
     actor_rollout_ref.actor.loss_agg_mode=${loss_agg_mode} \
     actor_rollout_ref.actor.ulysses_sequence_parallel_size=${sp_size} \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.50 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.25 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=${gen_tp} \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.n=${n_resp_per_prompt} \
@@ -99,11 +100,12 @@ python3 -m recipe.dapo.main_dapo \
     trainer.logger='["console","wandb"]' \
     trainer.project_name="${project_name}" \
     trainer.experiment_name="${exp_name}" \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=2 \
     trainer.nnodes="${NNODES}" \
     trainer.val_before_train=False \
-    trainer.test_freq=10 \
-    trainer.save_freq=30 \
+    trainer.save_freq=50 \
+    trainer.test_freq=50 \
+    trainer.total_training_steps=100 \
     trainer.total_epochs=1 \
     trainer.default_local_dir="${CKPTS_DIR}" \
-    trainer.resume_mode=auto
+    trainer.resume_mode=auto \
