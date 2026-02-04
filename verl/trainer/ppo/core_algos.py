@@ -501,7 +501,7 @@ def compute_cdpo_outcome_advantage(
         raise ValueError(
             f"Confidences shape {confidences.shape} must match scores shape {scores.shape}"
         )
-    breakpoint()
+    # breakpoint()
     with torch.no_grad():
         bsz = scores.shape[0]
         for i in range(bsz):
@@ -534,35 +534,9 @@ def compute_cdpo_outcome_advantage(
         mean_confidences = -mean_confidences
         mean_confidences = mean_confidences.unsqueeze(-1) * response_mask
 
-        new_scores = scores + 0.2 * mean_confidences
+        new_scores = 0.8 * scores + 0.2 * mean_confidences
 
         advantages = verl_F.masked_whiten(new_scores, response_mask) * response_mask
-
-        mu = verl_F.masked_mean(confidences, response_mask, axis=-1).unsqueeze(-1)
-        var = verl_F.masked_var(confidences, response_mask)
-        var_tok = verl_F.masked_mean((confidences - mu) ** 2, response_mask, axis=-1).unsqueeze(-1)
-        z = ((confidences - mu) * torch.rsqrt(var_tok + 1e-8)) * response_mask
-
-        high_cert = torch.sigmoid(z / 1.0) * response_mask
-        low_cert = (1.0 - high_cert) * response_mask
-
-        correct_t = correct_mask.unsqueeze(-1) * response_mask
-        wrong_t = wrong_mask.unsqueeze(-1) * response_mask
-
-        w = torch.ones_like(advantages)
-        w = torch.where(correct_t.bool(), low_cert.clamp_min(0.0).pow(1.0), w)
-        w = torch.where(wrong_t.bool(), high_cert.clamp_min(0.0).pow(1.0), w)
-
-        w_final = (1.0 - 0.5) + 0.5 * w
-
-        advantages = advantages * w_final * response_mask
-
-        base_mag = torch.clamp(scores.abs(), min=1e-3)
-        lower_bound_correct = base_mag / 5.0
-        upper_bound_wrong = -base_mag / 5.0
-
-        advantages = torch.where(correct_t.bool(), torch.maximum(advantages, lower_bound_correct), advantages)
-        advantages = torch.where(wrong_t.bool(), torch.minimum(advantages, upper_bound_wrong), advantages)
 
         advantages = advantages * response_mask
     

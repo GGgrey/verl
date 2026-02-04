@@ -13,13 +13,13 @@
 
 set -xeuo pipefail
 
-export RAY_TMPDIR="/root/tmp/"
+export RAY_TMPDIR="/workspace/verl_exp/"
 export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
-export WANDB_DIR="/root/siton-data-0072803f053947c8bb3fe64d115b30e3/verl_exp/"
+export WANDB_DIR="/workspace/verl_exp/"
 export WANDB_MODE=online
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
+export CUDA_VISIBLE_DEVICES="4,5,6,7"
 
 # Set how many GPUs we actually have on this node.
 export GPUS_PER_NODE=4
@@ -63,14 +63,14 @@ WORKING_DIR=${WORKING_DIR:-"${PWD}"}
 RUNTIME_ENV=${RUNTIME_ENV:-"${WORKING_DIR}/verl/trainer/runtime_env.yaml"}
 
 # Paths
-RAY_DATA_HOME=${RAY_DATA_HOME:-"/root/siton-data-0072803f053947c8bb3fe64d115b30e3/verl_exp"}
-MODEL_PATH=${MODEL_PATH:-"/root/siton-data-0072803f053947c8bb3fe64d115b30e3/models/Qwen/Qwen2.5-1.5B"}
+RAY_DATA_HOME=${RAY_DATA_HOME:-"/workspace/verl_exp"}
+MODEL_PATH=${MODEL_PATH:-"/models/Qwen/Qwen2.5-1.5B"}
 CKPTS_DIR=${CKPTS_DIR:-"${RAY_DATA_HOME}/ckpts/${project_name}/${exp_name}"}
 TRAIN_FILE=${TRAIN_FILE:-"${RAY_DATA_HOME}/data/math/train.parquet"}
 TEST_FILE=${TEST_FILE:-"${RAY_DATA_HOME}/data/math/test.parquet"}
 
 offload=false # it's a small model, offloading will just slow-down training
-gpu_memory_utilization=0.50
+gpu_memory_utilization=0.55
 reward_manager=dapo
 
 test_freq=10
