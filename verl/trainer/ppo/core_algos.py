@@ -471,6 +471,76 @@ def compute_cgpo_outcome_advantage(
     return token_advantages, token_advantages
 
 
+# @register_adv_est(AdvantageEstimator.CDPO)  # or simply: @register_adv_est("cdpo")
+# def compute_cdpo_outcome_advantage(
+#     token_level_rewards: torch.Tensor,
+#     confidences: torch.Tensor,
+#     response_mask: torch.Tensor,
+#     index: np.ndarray,
+#     epsilon: float = 1e-6,
+#     norm_adv_by_std_in_grpo: bool = True,
+#     config: Optional[AlgoConfig] = None,
+# ) -> tuple[torch.Tensor, torch.Tensor]:
+#     if confidences.shape != response_mask.shape:
+#         raise ValueError(
+#             f"Confidences shape {confidences.shape} must match response_mask shape {response_mask.shape}"
+#         )
+#     scores = token_level_rewards.sum(dim=-1)
+#     id2score = defaultdict(list)
+#     id2mean = {}
+#     id2std = {}
+
+#     id2conf = defaultdict(list)
+#     id2conf_mean = {}
+#     id2conf_std = {}
+#     response_length = response_mask.sum(dim=-1).clamp_min(1.0)
+#     mean_confidences = (confidences * response_mask).sum(dim=-1) / response_length
+#     if scores.shape != mean_confidences.shape:
+#         raise ValueError(
+#             f"Confidences shape {confidences.shape} must match scores shape {scores.shape}"
+#         )
+
+#     with torch.no_grad():
+#         bsz = scores.shape[0]
+#         for i in range(bsz):
+#             id2score[index[i]].append(scores[i])
+#             id2conf[index[i]].append(mean_confidences[i])
+#         for idx in id2score:
+#             if len(id2score[idx]) == 1:
+#                 id2mean[idx] = torch.tensor(0.0)
+#                 id2std[idx] = torch.tensor(1.0)
+#                 id2conf_mean[idx] = torch.tensor(0.0)
+#                 id2conf_std[idx] = torch.tensor(1.0)
+#             elif len(id2score[idx]) > 1:
+#                 scores_tensor = torch.stack(id2score[idx])
+#                 id2mean[idx] = torch.mean(scores_tensor)
+#                 id2std[idx] = torch.std(scores_tensor)
+#                 confs_tensor = torch.stack(id2conf[idx])
+#                 id2conf_mean[idx] = torch.mean(confs_tensor)
+#                 id2conf_std[idx] = torch.std(confs_tensor)
+#             else:
+#                 raise ValueError(f"No score in prompt index: {idx}")
+#         for i in range(bsz):
+#             if norm_adv_by_std_in_grpo:
+#                 scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
+#                 mean_confidences[i] = (mean_confidences[i] - id2conf_mean[index[i]]) / (id2conf_std[index[i]] + epsilon)
+#             else:
+#                 scores[i] = scores[i] - id2mean[index[i]]
+#                 mean_confidences[i] = mean_confidences[i] - id2conf_mean[index[i]]
+
+#         scores = scores.unsqueeze(-1) * response_mask
+#         mean_confidences = -mean_confidences
+#         mean_confidences = mean_confidences.unsqueeze(-1) * response_mask
+
+#         new_scores = 0.8 * scores + 0.2 * mean_confidences
+
+#         advantages = verl_F.masked_whiten(new_scores, response_mask) * response_mask
+
+#         advantages = advantages * response_mask
+    
+#     return advantages, advantages
+
+
 @register_adv_est(AdvantageEstimator.CDPO)  # or simply: @register_adv_est("cdpo")
 def compute_cdpo_outcome_advantage(
     token_level_rewards: torch.Tensor,
@@ -489,8 +559,6 @@ def compute_cdpo_outcome_advantage(
     id2score = defaultdict(list)
     id2mean = {}
     id2std = {}
-    correct_mask = (scores == 1.0)
-    wrong_mask = (scores == 0.0)
 
     id2conf = defaultdict(list)
     id2conf_mean = {}
@@ -501,7 +569,7 @@ def compute_cdpo_outcome_advantage(
         raise ValueError(
             f"Confidences shape {confidences.shape} must match scores shape {scores.shape}"
         )
-    # breakpoint()
+
     with torch.no_grad():
         bsz = scores.shape[0]
         for i in range(bsz):
@@ -553,40 +621,10 @@ def compute_codapo_outcome_advantage(
     norm_adv_by_std_in_grpo: bool = True,
     config: Optional[AlgoConfig] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Compute advantage for RFPO, operating only on Outcome reward
-    (with only one scalar reward for each response).
-
-    Args:
-        token_level_rewards: `(torch.Tensor)`
-            shape is (bs, response_length)
-        old_log_probs: `(torch.Tensor)`
-            shape is (bs, response_length)
-        response_mask: `(torch.Tensor)`
-            shape is (bs, response_length)
-        index: `(np.ndarray)`
-            index array for grouping
-        epsilon: `(float)`
-            small value to avoid division by zero
-        norm_adv_by_std_in_grpo: `(bool)`
-            whether to scale the RFPO advantage
-        config: `(Optional[AlgoConfig])`
-            algorithm configuration object
-
-    Note:
-        If norm_adv_by_std_in_grpo is True, the advantage is scaled by the std, as in the original GRPO.
-        If False, the advantage is not scaled, as in Dr.GRPO (https://arxiv.org/abs/2503.20783).
-
-    Returns:
-        advantages: `(torch.Tensor)`
-            shape is (bs, response_length)
-        Returns: `(torch.Tensor)`
-            shape is (bs, response_length)
-    """
     delta = 0.4
 
-    scores_raw = token_level_rewards.sum(dim=-1)
-    scores = scores_raw.clone()
+    raw_scores = token_level_rewards.sum(dim=-1)
+    scores = raw_scores.clone()
 
     id2score = defaultdict(list)
     id2mean = {}
@@ -612,40 +650,36 @@ def compute_codapo_outcome_advantage(
             else:
                 scores[i] = scores[i] - id2mean[index[i]]
 
-    oi = response_mask.sum(dim=-1).clamp_min(1.0)
-    mean_logp = (old_log_probs * response_mask).sum(dim=-1) / oi
+        response_lengths = response_mask.sum(dim=-1).clamp_min(1.0)
+        mean_logps = (old_log_probs * response_mask).sum(dim=-1) / response_lengths
 
-    id2mean_logp = {}
-    with torch.no_grad():
+        id2mean_logp = {}
         id2logp_list = defaultdict(list)
         for i in range(bsz):
-            id2logp_list[index[i]].append(mean_logp[i])
+            id2logp_list[index[i]].append(mean_logps[i])
 
         for idx, lst in id2logp_list.items():
             mean_logp_group = torch.stack(lst).mean()
             id2mean_logp[idx] = mean_logp_group
 
-    with torch.no_grad():
         c = torch.empty_like(scores)
         for i in range(bsz):
             numerator = id2mean_logp[index[i]]
-            c[i] = torch.sigmoid(numerator / (mean_logp[i] + epsilon))
+            c[i] = torch.sigmoid(numerator / (mean_logps[i] + epsilon))
 
-    with torch.no_grad():
         d = torch.empty_like(scores)
-        id2raw_list = defaultdict(list)
+        id2raw_score = defaultdict(list)
         for i in range(bsz):
-            id2raw_list[index[i]].append(scores_raw[i])
+            id2raw_score[index[i]].append(raw_scores[i])
         
         id2raw_mean = {}
-        for idx, lst in id2raw_list.items():
+        for idx, lst in id2raw_score.items():
             id2raw_mean[idx] = torch.stack(lst).mean()
 
         for i in range(bsz):
             r_bar = id2raw_mean[index[i]]
             d[i] = 1.0 + delta * (r_bar - 0.5) ** 2
 
-    with torch.no_grad():
         scores = scores * c * d
     
     scores = scores.unsqueeze(-1) * response_mask
