@@ -654,11 +654,11 @@ def compute_codapo_outcome_advantage(
         mean_logps = (old_log_probs * response_mask).sum(dim=-1) / response_lengths
 
         id2mean_logp = {}
-        id2logp_list = defaultdict(list)
+        id2logp = defaultdict(list)
         for i in range(bsz):
-            id2logp_list[index[i]].append(mean_logps[i])
+            id2logp[index[i]].append(mean_logps[i])
 
-        for idx, lst in id2logp_list.items():
+        for idx, lst in id2logp.items():
             mean_logp_group = torch.stack(lst).mean()
             id2mean_logp[idx] = mean_logp_group
 
