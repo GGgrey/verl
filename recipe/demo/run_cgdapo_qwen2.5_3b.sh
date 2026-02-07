@@ -95,6 +95,7 @@ python3 -m recipe.dapo.main_dapo \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.n=${n_resp_per_prompt} \
     actor_rollout_ref.rollout.calculate_confs=True \
+    actor_rollout_ref.rollout.logprobs=20 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     reward_model.reward_manager=dapo \
     trainer.logger='["console","wandb"]' \

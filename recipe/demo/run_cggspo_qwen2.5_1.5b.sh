@@ -105,6 +105,7 @@ python3 -m verl.trainer.main_ppo \
     data.max_response_length=${max_response_length} \
     actor_rollout_ref.rollout.n=${n_resp_per_prompt} \
     actor_rollout_ref.rollout.calculate_confs=True \
+    actor_rollout_ref.rollout.logprobs=20 \
     algorithm.use_kl_in_reward=${use_kl_in_reward} \
     algorithm.kl_ctrl.kl_coef=${kl_coef} \
     actor_rollout_ref.actor.use_kl_loss=${use_kl_loss} \
