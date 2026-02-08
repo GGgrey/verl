@@ -6,10 +6,9 @@ from collections import defaultdict
 
 
 # Usage: python convert_ckpt.py fsdp_checkpoint_path base_model_name_or_path output_path
-def main(fsdp_checkpoint_path, base_model_name_or_path, output_path):
+def main(fsdp_checkpoint_path, base_model_name_or_path, output_path, world_size=4):
     state_dict = defaultdict(list)
 
-    world_size = 4
     for rank in range(world_size):
         filepath = f"{fsdp_checkpoint_path}/model_world_size_{world_size}_rank_{rank}.pt"
         print("Loading file: ", filepath)

@@ -8,10 +8,10 @@ export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
 export CUDA_VISIBLE_DEVICES="4,5,6,7"
 
-project_name='GRPO'
-exp_name='GRPO-Qwen2.5-1.5B'
+project_name='ConfClip'
+exp_name='ConfClip-Qwen2.5-3B'
 
-adv_estimator=grpo
+adv_estimator=confclip
 
 use_kl_in_reward=False
 use_kl_loss=True
@@ -35,7 +35,7 @@ NNODES=${NNODES:-1}
 
 # Paths
 RAY_DATA_HOME=${RAY_DATA_HOME:-"/workspace/verl_exp"}
-MODEL_PATH=${MODEL_PATH:-"/models/Qwen/Qwen2.5-1.5B"}
+MODEL_PATH=${MODEL_PATH:-"/models/Qwen/Qwen2.5-3B"}
 CKPTS_DIR=${CKPTS_DIR:-"${RAY_DATA_HOME}/ckpts/${project_name}/${exp_name}"}
 TRAIN_FILE=${TRAIN_FILE:-"${RAY_DATA_HOME}/data/math/train.parquet"}
 TEST_FILE=${TEST_FILE:-"${RAY_DATA_HOME}/data/math/test.parquet"}
@@ -57,6 +57,7 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     data.filter_overlong_prompts=${filter_overlong_prompts} \
     data.truncation='error' \
     algorithm.adv_estimator=${adv_estimator} \
+    algorithm.confclip_hyperparameter=0.2 \
     algorithm.use_kl_in_reward=${use_kl_in_reward} \
     actor_rollout_ref.model.path="${MODEL_PATH}" \
     actor_rollout_ref.actor.loss_agg_mode=${loss_agg_mode} \
@@ -91,4 +92,4 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     trainer.test_freq=10 \
     trainer.default_local_dir="${CKPTS_DIR}" \
     trainer.resume_mode=auto \
-    trainer.total_epochs=1 2>&1 | tee grpo_qwen2.5_1.5b.log
+    trainer.total_epochs=1

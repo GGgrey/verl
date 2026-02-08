@@ -94,4 +94,4 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     trainer.total_training_steps=100 \
     trainer.default_local_dir="${CKPTS_DIR}" \
     trainer.resume_mode=auto \
-    trainer.total_epochs=1 2>&1 | tee grpo_qwen2.5_7b.log
+    trainer.total_epochs=1

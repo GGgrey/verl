@@ -1,17 +1,17 @@
 set -x
 
-export RAY_TMPDIR="/workspace/tmp/"
+export RAY_TMPDIR="/workspace/verl_exp/"
 export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
 export WANDB_DIR="/workspace/verl_exp/"
-export WANDB_MODE=offline
+export WANDB_MODE=online
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="6,7"
+export CUDA_VISIBLE_DEVICES="4,5,6,7"
 
-project_name='ConfClip'
-exp_name='ConfClip-Qwen2.5-1.5B'
+project_name='GRPO'
+exp_name='GRPO-Qwen2.5-1.5B'
 
-adv_estimator=confclip
+adv_estimator=grpo
 
 use_kl_in_reward=False
 use_kl_loss=True
@@ -57,7 +57,6 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     data.filter_overlong_prompts=${filter_overlong_prompts} \
     data.truncation='error' \
     algorithm.adv_estimator=${adv_estimator} \
-    algorithm.confclip_hyperparameter=0.2 \
     algorithm.use_kl_in_reward=${use_kl_in_reward} \
     actor_rollout_ref.model.path="${MODEL_PATH}" \
     actor_rollout_ref.actor.loss_agg_mode=${loss_agg_mode} \
@@ -83,7 +82,7 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     trainer.critic_warmup=0 \
     trainer.val_before_train=False \
-    trainer.n_gpus_per_node=2 \
+    trainer.n_gpus_per_node=4 \
     trainer.nnodes="${NNODES}" \
     trainer.logger=['console','wandb'] \
     trainer.project_name="${project_name}" \
@@ -92,4 +91,4 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     trainer.test_freq=10 \
     trainer.default_local_dir="${CKPTS_DIR}" \
     trainer.resume_mode=auto \
-    trainer.total_epochs=1 2>&1 | tee confclip_qwen2.5_1.5b.log
+    trainer.total_epochs=1
