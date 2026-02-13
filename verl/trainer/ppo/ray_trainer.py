@@ -284,13 +284,13 @@ def compute_advantage(
         data.batch["advantages"] = advantages
         data.batch["returns"] = returns
     elif adv_estimator == AdvantageEstimator.CDPO:
-        confidences = data.batch["rollout_confs"]
+        old_log_probs = data.batch["old_log_probs"]
         response_mask = data.batch["response_mask"]
-        response_mask = response_mask.to(confidences.dtype)
+        response_mask = response_mask.to(old_log_probs.dtype)
 
         advantages, returns = core_algos.compute_cdpo_outcome_advantage(
             token_level_rewards=data.batch["token_level_rewards"],
-            confidences=confidences,
+            old_log_probs=old_log_probs,
             response_mask=response_mask,
             index=data.non_tensor_batch["uid"],
             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
