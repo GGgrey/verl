@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-export RAY_TMPDIR="/workspace/verl_exp/"
+export RAY_TMPDIR="/data/sunqiao/projects/verl_exp/"
 export WANDB_API_KEY=37f371d2968f35d69749ee52089583eb8e1f0cab
-export WANDB_DIR="/workspace/verl_exp/"
+export WANDB_DIR="/data/sunqiao/projects/verl_exp/"
 export WANDB_MODE=online
 export ACCELERATE_LOG_LEVEL=info
 export HYDRA_FULL_ERROR=1
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
+export CUDA_VISIBLE_DEVICES="0,1"
 
 project_name='DAPO'
 exp_name='DAPO-Qwen2.5-7B'
@@ -45,8 +45,8 @@ RUNTIME_ENV=${RUNTIME_ENV:-"${WORKING_DIR}/verl/trainer/runtime_env.yaml"}
 NNODES=${NNODES:-1}
 
 # Paths
-RAY_DATA_HOME=${RAY_DATA_HOME:-"/workspace/verl_exp"}
-MODEL_PATH=${MODEL_PATH:-"/models/Qwen/Qwen2.5-7B"}
+RAY_DATA_HOME=${RAY_DATA_HOME:-"/data/sunqiao/projects/verl_exp"}
+MODEL_PATH=${MODEL_PATH:-"/data/sunqiao/projects/models/Qwen/Qwen2.5-7B"}
 CKPTS_DIR=${CKPTS_DIR:-"${RAY_DATA_HOME}/ckpts/${project_name}/${exp_name}"}
 TRAIN_FILE=${TRAIN_FILE:-"${RAY_DATA_HOME}/data/math/train.parquet"}
 TEST_FILE=${TEST_FILE:-"${RAY_DATA_HOME}/data/math/test.parquet"}
@@ -128,7 +128,7 @@ python3 -m recipe.dapo.main_dapo \
     trainer.logger='["console","wandb"]' \
     trainer.project_name="${project_name}" \
     trainer.experiment_name="${exp_name}" \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=2 \
     trainer.nnodes="${NNODES}" \
     trainer.val_before_train=False \
     trainer.test_freq=50 \
